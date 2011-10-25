@@ -199,7 +199,12 @@ do
   # Clone the original Subversion repository to a temp repository.
   cd $pwd;
   echo "- Cloning repository..." >&2;
-  git svn clone $url -A $authors_file --authors-prog=$dir/svn-lookup-author.sh --stdlayout --quiet $gitsvn_params $tmp_destination;
+#  git svn clone $url -A $authors_file --authors-prog=$dir/svn-lookup-author.sh --stdlayout --quiet $gitsvn_params $tmp_destination;
+  git svn init $url --stdlayout $gitsvn_params $tmp_destination;
+  remote_prefix=`git --git-dir=$tmp_destination/.git config --get-all svn-remote.svn.branches '.*/branches/\*:refs/remotes/\*$' | sed 's/\/branches\/\*:refs\/remotes\/\*$//'`
+  git --git-dir=$tmp_destination/.git config --add svn-remote.svn.branches "$remote_prefix/tickets/*:refs/remotes/tickets/*"
+  git --git-dir=$tmp_destination/.git --work-tree=$tmp_destination svn fetch -A $authors_file --authors-prog=$dir/svn-lookup-author.sh --quiet
+  (cd $tmp_destination && git reset --hard)
 
   # Create .gitignore file.
   echo "- Converting svn:ignore properties into a .gitignore file..." >&2;
@@ -237,7 +242,7 @@ do
   git for-each-ref --format='%(refname)' refs/heads/tags | cut -d / -f 4 |
   while read ref
   do
-    git tag -a "$ref" -m "Convert \"$ref\" to a proper git tag." "refs/heads/tags/$ref";
+    git tag -a "$ref" -m "Version $ref" "refs/heads/tags/$ref";
     git branch -D "tags/$ref";
   done
 
