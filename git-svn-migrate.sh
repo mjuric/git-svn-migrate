@@ -191,20 +191,22 @@ do
   echo "Processing \"$name\" repository at $url..." >&2;
 
   # Init the final bare repository.
-  mkdir $destination/$name.git;
+  mkdir $destination/$name.git || exit;
   cd $destination/$name.git;
-  git init --bare $gitinit_params;
-  git symbolic-ref HEAD refs/heads/trunk;
+  git init --bare $gitinit_params || exit
+  git config pack.windowMemory 250m || exit
+  git symbolic-ref HEAD refs/heads/trunk || exit
 
   # Clone the original Subversion repository to a temp repository.
   cd $pwd;
   echo "- Cloning repository..." >&2;
 #  git svn clone $url -A $authors_file --authors-prog=$dir/svn-lookup-author.sh --stdlayout --quiet $gitsvn_params $tmp_destination;
-  git svn init $url --stdlayout $gitsvn_params $tmp_destination;
+  git svn init $url --stdlayout $gitsvn_params $tmp_destination || exit
+  (cd $tmp_destination && git config pack.windowMemory 250m) || exit
   remote_prefix=`git --git-dir=$tmp_destination/.git config --get-all svn-remote.svn.branches '.*/branches/\*:refs/remotes/\*$' | sed 's/\/branches\/\*:refs\/remotes\/\*$//'`
-  git --git-dir=$tmp_destination/.git config --add svn-remote.svn.branches "$remote_prefix/tickets/*:refs/remotes/tickets/*"
-  git --git-dir=$tmp_destination/.git --work-tree=$tmp_destination svn fetch -A $authors_file --authors-prog=$dir/svn-lookup-author.sh --quiet
-  (cd $tmp_destination && git reset --hard)
+  git --git-dir=$tmp_destination/.git config --add svn-remote.svn.branches "$remote_prefix/tickets/*:refs/remotes/tickets/*" || exit
+  git --git-dir=$tmp_destination/.git --work-tree=$tmp_destination svn fetch -A $authors_file --authors-prog=$dir/svn-lookup-author.sh --quiet || exit
+  (cd $tmp_destination && git reset --hard) || exit
 
   # Create .gitignore file.
   echo "- Converting svn:ignore properties into a .gitignore file..." >&2;
@@ -212,29 +214,32 @@ do
     cp $ignore_file $tmp_destination/.gitignore;
   fi
   cd $tmp_destination;
-  git svn show-ignore --id trunk >> .gitignore;
-  git add .gitignore;
-  git commit --author="git-svn-migrate <nobody@example.org>" -m 'Convert svn:ignore properties to .gitignore.';
+  git svn show-ignore --id trunk >> .gitignore || exit
+  git add .gitignore || exit
+  git commit --author="git-svn-migrate <nobody@example.org>" -m 'Convert svn:ignore properties to .gitignore.' || exit
+
+  # Repack
+  #git repack -a -f -d || exit
 
   # Push to final bare repository and remove temp repository.
   echo "- Pushing to new bare repository..." >&2;
-  git remote add bare $destination/$name.git;
-  git config remote.bare.push 'refs/remotes/*:refs/heads/*';
-  git push bare;
+  git remote add bare $destination/$name.git || exit
+  git config remote.bare.push 'refs/remotes/*:refs/heads/*' || exit
+  git push bare || exit
   # Push the .gitignore commit that resides on master.
-  git push bare master:trunk;
+  git push bare master:trunk || exit
   cd $pwd;
   rm -r $tmp_destination;
 
   # Rename Subversion's "trunk" branch to Git's standard "master" branch.
   cd $destination/$name.git;
-  git branch -m trunk master;
+  git branch -m trunk master || exit
 
   # Remove bogus branches of the form "name@REV".
   git for-each-ref --format='%(refname)' refs/heads | grep '@[0-9][0-9]*' | cut -d / -f 3- |
   while read ref
   do
-    git branch -D "$ref";
+    git branch -D "$ref" || exit
   done
 
   # Convert git-svn tag branches to proper tags.
@@ -242,8 +247,8 @@ do
   git for-each-ref --format='%(refname)' refs/heads/tags | cut -d / -f 4 |
   while read ref
   do
-    git tag -a "$ref" -m "Version $ref" "refs/heads/tags/$ref";
-    git branch -D "tags/$ref";
+    git tag -a "$ref" -m "Version $ref" "refs/heads/tags/$ref" || exit
+    git branch -D "tags/$ref" || exit
   done
 
   echo "- Conversion completed at $(date)." >&2;

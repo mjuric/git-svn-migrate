@@ -8,6 +8,6 @@ for SDIR in $(find . -name '*.subdirs'); do
 	test ! -d "$BASE"
 	for SUBDIR in $(find "$SDIR" -maxdepth 1 -mindepth 1 -type d); do
 		REL=$(basename $SDIR)"/"$(basename "$SUBDIR")
-		cd $BASE && ln -sf ../$REL
+		(cd $BASE && ln -sf ../$REL)
 	done
 done

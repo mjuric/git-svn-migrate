@@ -1,0 +1,60 @@
+######## Converting LSST SVN repos to git, a helper script
+######## This is not really a script, more of a list of commands to
+######## judiciously run by hand.
+
+export TOKEN="mjuric/token:XXXXXXXXXXXXXXXXX"
+
+# Import on nebel, upload to github
+#export SVN_REPOS=file:///raid14/home/mjuric/projects/lsst-svn/lsst/repos/
+#export GIT_REPOS=
+#export SHARED_OPT=
+#export GIT_URL_ROOT="git@github.com:LSST"
+#export GIT_URL_ROOT_EXT="git@github.com:LSST"
+
+# Import on svn.lsstcorp.org, keep repos there
+export SVN_REPOS=file:///lsst/repos
+export GIT_REPOS=/lsst_ibrix/git
+export SHARED_OPT="--shared=group"
+export GIT_URL_ROOT="$GIT_REPOS"
+export GIT_URL_ROOT_EXT="svn.lsstcorp.org:/lsst_ibrix/git"
+
+# Get list of packages, ignoring DCTags repository
+#
+svn list -R $SVN_REPOS | grep -e 'trunk/$' | grep -v '/tags/' | sed 's/\/trunk\/$//' | grep -v '/trunk/' | grep -v "^DCtags/" > $GIT_REPOS/package-list.txt
+# Flatten the hierarchy; convert '/' to '.'
+perl -e 'while($_=<>) { chomp; $d=$_; $d =~ tr/\//./; print "$d '"$SVN_REPOS"'/$_\n"; }' $GIT_REPOS/package-list.txt  > $GIT_REPOS/repos.txt
+
+# Get authors
+./fetch-svn-authors.sh --url-file=$GIT_REPOS/repos.txt > $GIT_REPOS/authors.txt
+
+# Delete existing git repos
+rm -rf $GIT_REPOS/*.git tmp-git-repo
+
+# Migrate to git
+./git-svn-migrate.sh --url-file=$GIT_REPOS/repos.txt --authors-file=$GIT_REPOS/authors.txt --no-metadata --destination=$GIT_REPOS $SHARED_OPT 2>&1 | tee $GIT_REPOS/migration.log
+# Use this while debugging
+cut -d ' ' -f 1 repos.txt | perl -e 'while(<>) { chomp; print "rm -rf $_.git && cp -a bak/$_.git $_.git && echo $_.git copied\n"; }' | bash
+
+# Hand fixups (obsolete)
+#./fixups.sh
+
+# github only: Select repos to upload to github (only those not larger than 50MB, for a test)
+du --max-depth=0 `cut -d' ' -f 1 repos.txt | sed 's/$/.git/'` | sort -n | perl -e \
+	'while(<>) { chomp; ($s, $r) = split; if($s < 50*1024) { print "$r\n"; $n += $s; } } print STDERR "Total: $n\n"' | sort > upload-repos.txt
+
+# github only: Upload to github (ok to run it several times)
+./github-upload.sh "$TOKEN" `cat upload-repos.txt`
+
+# Create the superprojects
+./make-superprojects.sh $GIT_REPOS/repos.txt "$GIT_URL_ROOT"
+
+# github only: Upload superprojects to github
+./github-upload.sh "$TOKEN" `cat superprojects.txt`
+
+############ Notes:
+
+# Pushing upstream to github
+#git push -u origin master	# Note: For just pushing up master
+#git remote add origin git@github.com:LSST/DMS.afw.git	# Add a remote
+#git push --all -u					# Push all branches, set them up to track upstream
+#git push --tags					# Push all tags
