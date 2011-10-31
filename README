@@ -2,21 +2,23 @@
 ######## This is not really a script, more of a list of commands to
 ######## judiciously run by hand.
 
+
 export TOKEN="mjuric/token:XXXXXXXXXXXXXXXXX"
+
+# rsync our repositories
+rsync -avz svn.lsstcorp.org:/lsst/repos $HOME/lsst
 
 # Import on nebel, upload to github
 #export SVN_REPOS=file:///raid14/home/mjuric/projects/lsst-svn/lsst/repos/
 #export GIT_REPOS=
-#export SHARED_OPT=
 #export GIT_URL_ROOT="git@github.com:LSST"
 #export GIT_URL_ROOT_EXT="git@github.com:LSST"
 
 # Import on svn.lsstcorp.org, keep repos there
-export SVN_REPOS=file:///lsst/repos
-export GIT_REPOS=/lsst_ibrix/git
-export SHARED_OPT="--shared=group"
+export SVN_REPOS=file://$HOME/lsst/repos
+export GIT_REPOS=$HOME/lsst/git
 export GIT_URL_ROOT="$GIT_REPOS"
-export GIT_URL_ROOT_EXT="svn.lsstcorp.org:/lsst_ibrix/git"
+export GIT_URL_ROOT_EXT="git@svn.lsstcorp.org:LSST"
 
 # Get list of packages, ignoring DCTags repository
 #
@@ -31,7 +33,7 @@ perl -e 'while($_=<>) { chomp; $d=$_; $d =~ tr/\//./; print "$d '"$SVN_REPOS"'/$
 rm -rf $GIT_REPOS/*.git tmp-git-repo
 
 # Migrate to git
-./git-svn-migrate.sh --url-file=$GIT_REPOS/repos.txt --authors-file=$GIT_REPOS/authors.txt --no-metadata --destination=$GIT_REPOS $SHARED_OPT 2>&1 | tee $GIT_REPOS/migration.log
+./git-svn-migrate.sh --url-file=$GIT_REPOS/repos.txt --authors-file=$GIT_REPOS/authors.txt --no-metadata --destination=$GIT_REPOS 2>&1 | tee $GIT_REPOS/migration.log
 # Use this while debugging
 cut -d ' ' -f 1 repos.txt | perl -e 'while(<>) { chomp; print "rm -rf $_.git && cp -a bak/$_.git $_.git && echo $_.git copied\n"; }' | bash
 
