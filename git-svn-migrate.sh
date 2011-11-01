@@ -215,7 +215,7 @@ do
   fi
   cd $tmp_destination;
   git svn show-ignore --id trunk >> .gitignore || exit
-  git add .gitignore || exit
+  git add -f .gitignore || exit
   git commit --author="git-svn-migrate <nobody@example.org>" -m 'Convert svn:ignore properties to .gitignore.' || exit
 
   # Repack

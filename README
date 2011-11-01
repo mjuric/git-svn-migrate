@@ -14,11 +14,12 @@ rsync -avz svn.lsstcorp.org:/lsst/repos $HOME/lsst
 #export GIT_URL_ROOT="git@github.com:LSST"
 #export GIT_URL_ROOT_EXT="git@github.com:LSST"
 
-# Import on svn.lsstcorp.org, keep repos there
+# Import on svn.lsstcorp.org or nebel, upload to gitolite account
 export SVN_REPOS=file://$HOME/lsst/repos
 export GIT_REPOS=$HOME/lsst/git
 export GIT_URL_ROOT="$GIT_REPOS"
 export GIT_URL_ROOT_EXT="git@svn.lsstcorp.org:LSST"
+export GITOLITE_ADMIN="$HOME/projects/git-svn-migrate/gitolite-admin"
 
 # Get list of packages, ignoring DCTags repository
 #
@@ -37,21 +38,35 @@ rm -rf $GIT_REPOS/*.git tmp-git-repo
 # Use this while debugging
 cut -d ' ' -f 1 repos.txt | perl -e 'while(<>) { chomp; print "rm -rf $_.git && cp -a bak/$_.git $_.git && echo $_.git copied\n"; }' | bash
 
+# Create a list of repos for gitolite. Move this file to gitolite-admin/conf
+# subdirectory, then 'git push' it to create the repos upstream
+for REPO in $(find ~/lsst/git -name "*.git" -type d -exec basename {} .git \;); do echo "@repos = LSST/${REPO//.//}"; done > $GITOLITE_ADMIN/conf/repos.conf
+(cd $GITOLITE_ADMIN && git commit -a && git push)
+
+# Create initial list of LSST developers (everyone)
+(cd $GITOLITE_ADMIN/keydir && for U in $(ls *.pub | sed 's/\@.*\.pub//' | sort -u); do echo "@devs = $U"; done > ../conf/devs.conf)
+
+# Fixups
+(cd $GIT_REPOS/sims.catalogs.generation.git && git branch -m "tickets/#1794" "tickets/1794a") # Peter's screwed up branch
+
+# Upload to gitolite
+./gitolite-upload.sh
+
 # Hand fixups (obsolete)
 #./fixups.sh
 
 # github only: Select repos to upload to github (only those not larger than 50MB, for a test)
-du --max-depth=0 `cut -d' ' -f 1 repos.txt | sed 's/$/.git/'` | sort -n | perl -e \
-	'while(<>) { chomp; ($s, $r) = split; if($s < 50*1024) { print "$r\n"; $n += $s; } } print STDERR "Total: $n\n"' | sort > upload-repos.txt
+# du --max-depth=0 `cut -d' ' -f 1 repos.txt | sed 's/$/.git/'` | sort -n | perl -e \
+#	'while(<>) { chomp; ($s, $r) = split; if($s < 50*1024) { print "$r\n"; $n += $s; } } print STDERR "Total: $n\n"' | sort > upload-repos.txt
 
 # github only: Upload to github (ok to run it several times)
-./github-upload.sh "$TOKEN" `cat upload-repos.txt`
+# ./github-upload.sh "$TOKEN" `cat upload-repos.txt`
 
 # Create the superprojects
 ./make-superprojects.sh $GIT_REPOS/repos.txt "$GIT_URL_ROOT"
 
 # github only: Upload superprojects to github
-./github-upload.sh "$TOKEN" `cat superprojects.txt`
+# ./github-upload.sh "$TOKEN" `cat superprojects.txt`
 
 ############ Notes:
 
