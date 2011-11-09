@@ -1,0 +1,21 @@
+sims/selfcal/			# all subprojects here have only 'tickets' and 'trunk', no tags (should be fixed; done)
+vendor/activemqcpp/		# no trunk, some tags seem out of place (?!) (e-mailed Ray Plante; told not to care)
+
+activeoptics/			# All subdirectories don't have stdlayout; not sure if I should collapse them to a single repo?
+camera/old_CameraControl/	# Strange -- no trunk, just tags (just ignore it?)
+
+DMS/report/Dc2Report/		# no stdlayout
+DMS/report/reportDC3a/		# no stdlayout
+contrib/STOMP/			# no stdlayout
+contrib/bp/			# no stdlayout
+
+sims/atmosphere/mkatmos/	# no stdlayout
+sims/atmosphere/clouds/		# no stdlayout
+sims/cal/0/			# no stdlayout
+sims/cal/doc/			# no stdlayout
+sims/cal/utilities/		# no stdlayout
+sims/catalogs/old_cat_code/	# no stdlayout
+sims/db/			# no stdlayout
+sims/doc/			# no stdlayout
+
+3rdPartySW/auton/		# no stdlayout

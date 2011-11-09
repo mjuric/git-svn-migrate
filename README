@@ -1,12 +1,19 @@
+##### NOTE: This has been fully scriptified in convert.sh
+
 ######## Converting LSST SVN repos to git, a helper script
 ######## This is not really a script, more of a list of commands to
 ######## judiciously run by hand.
 
 
+export PERL5LIB="/raid14/home/mjuric/perl/lib64/perl5/site_perl/5.8.8/x86_64-linux-thread-multi"
 export TOKEN="mjuric/token:XXXXXXXXXXXXXXXXX"
 
 # rsync our repositories
 rsync -avz svn.lsstcorp.org:/lsst/repos $HOME/lsst
+
+##svnadmin create svn-mirror
+##echo '#!/bin/sh' > svn-mirror/hooks/pre-revprop-change && chmod +x svn-mirror/hooks/pre-revprop-change
+##svnsync init file://$PWD/svn-mirror svn+ssh://svn.lsstcorp.org/lsst/repos/
 
 # Import on nebel, upload to github
 #export SVN_REPOS=file:///raid14/home/mjuric/projects/lsst-svn/lsst/repos/
@@ -18,12 +25,13 @@ rsync -avz svn.lsstcorp.org:/lsst/repos $HOME/lsst
 export SVN_REPOS=file://$HOME/lsst/repos
 export GIT_REPOS=$HOME/lsst/git
 export GIT_URL_ROOT="$GIT_REPOS"
-export GIT_URL_ROOT_EXT="git@svn.lsstcorp.org:LSST"
+export GIT_URL_ROOT_EXT="git@svn.lsstcorp.org:"
 export GITOLITE_ADMIN="$HOME/projects/git-svn-migrate/gitolite-admin"
+export IMPORT_REPOS_REGEX="^(DMS|Trac|GilTest|comparisons|contrib|eups|vendor)"
 
-# Get list of packages, ignoring DCTags repository
+# Get list of packages to be converted
 #
-svn list -R $SVN_REPOS | grep -e 'trunk/$' | grep -v '/tags/' | sed 's/\/trunk\/$//' | grep -v '/trunk/' | grep -v "^DCtags/" > $GIT_REPOS/package-list.txt
+svn list -R $SVN_REPOS | grep -e 'trunk/$' | grep -v '/tags/' | sed 's/\/trunk\/$//' | grep -v '/trunk/' | grep -E "$IMPORT_REPOS_REGEX" > $GIT_REPOS/package-list.txt
 # Flatten the hierarchy; convert '/' to '.'
 perl -e 'while($_=<>) { chomp; $d=$_; $d =~ tr/\//./; print "$d '"$SVN_REPOS"'/$_\n"; }' $GIT_REPOS/package-list.txt  > $GIT_REPOS/repos.txt
 
@@ -38,16 +46,20 @@ rm -rf $GIT_REPOS/*.git tmp-git-repo
 # Use this while debugging
 cut -d ' ' -f 1 repos.txt | perl -e 'while(<>) { chomp; print "rm -rf $_.git && cp -a bak/$_.git $_.git && echo $_.git copied\n"; }' | bash
 
+# Migrate "simple" repos (those not having stdlayout)
+./migrate-simple.sh DMS/report/Dc2Report DMS/report/reportDC3a contrib/STOMP contrib/bp
+
+# Fixups
+(cd $GIT_REPOS/sims.catalogs.generation.git && git branch -m "tickets/#1794" "tickets/1794a") # Peter's screwed up branch
+mv $GIT_REPOS/DMS.meas.multifitData.git $GIT_REPOS/DMS.testdata.multifit.git	# Relocate multifitData
+
 # Create a list of repos for gitolite. Move this file to gitolite-admin/conf
 # subdirectory, then 'git push' it to create the repos upstream
 for REPO in $(find ~/lsst/git -name "*.git" -type d -exec basename {} .git \;); do echo "@repos = LSST/${REPO//.//}"; done > $GITOLITE_ADMIN/conf/repos.conf
 (cd $GITOLITE_ADMIN && git commit -a && git push)
 
-# Create initial list of LSST developers (everyone)
-(cd $GITOLITE_ADMIN/keydir && for U in $(ls *.pub | sed 's/\@.*\.pub//' | sort -u); do echo "@devs = $U"; done > ../conf/devs.conf)
-
-# Fixups
-(cd $GIT_REPOS/sims.catalogs.generation.git && git branch -m "tickets/#1794" "tickets/1794a") # Peter's screwed up branch
+# Create initial list of LSST developers (everyone; do this just once)
+# (cd $GITOLITE_ADMIN/keydir && for U in $(ls *.pub | sed 's/\@.*\.pub//' | sort -u); do echo "@devs = $U"; done > ../conf/devs.conf)
 
 # Upload to gitolite
 ./gitolite-upload.sh
@@ -62,13 +74,20 @@ for REPO in $(find ~/lsst/git -name "*.git" -type d -exec basename {} .git \;); 
 # github only: Upload to github (ok to run it several times)
 # ./github-upload.sh "$TOKEN" `cat upload-repos.txt`
 
-# Create the superprojects
-./make-superprojects.sh $GIT_REPOS/repos.txt "$GIT_URL_ROOT"
+# Create the superprojects (note: these don't include "simple" repos!!)
+# TODO: repos.txt should not be used here, as it doesn't include renamed repos and "simple" repos
+#./make-superprojects.sh $GIT_REPOS/repos.txt "$GIT_URL_ROOT_EXT"
 
 # github only: Upload superprojects to github
 # ./github-upload.sh "$TOKEN" `cat superprojects.txt`
 
 ############ Notes:
+
+svn list -R $SVN_REPOS | grep -v ^DCtags | grep '/$' > file_list.txt	# All directories
+RR=$(cat $GIT_REPOS/package-list.txt | perl -e 'while($_=<>) {chomp; next if $_ eq ""; push @l, $_;  }; print "(", join("|", @l), ")"')
+cat file_list.txt | grep -E -v "$RR" > nonstandard.txt
+
+
 
 # Pushing upstream to github
 #git push -u origin master	# Note: For just pushing up master

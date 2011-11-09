@@ -35,7 +35,7 @@ for REPODIR in $(cat "$GIT_REPOS/superprojects.txt"); do
 	for SUBMOD in $(cat $REPOS | grep "^$REPO\." | cut -d ' ' -f 1 | sort); do
 		SUBMOD=$(basename $SUBMOD .git)
 		SUBDIR=$(echo "$SUBMOD" | sed "s/^$REPO\.//" | sed 's/\./\//g')
-		SUBURL="$URLROOT/$SUBMOD.git"
+		SUBURL="$URLROOT/"${SUBMOD//.//}".git"
 
 		# Specials
 		if [ "$SUBDIR" == "afw/extensions/rgb" ]; then
