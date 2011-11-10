@@ -166,7 +166,9 @@ fi
 
 # Process each URL in the repository list.
 pwd=`pwd`;
-tmp_destination="$pwd/tmp-git-repo";
+TMP=${TMP:-/tmp}
+tmp_destination="$TMP/tmp-git-repo";
+rm -rf $tmp_destination;
 mkdir -p $destination;
 destination=`cd $destination; pwd`; #Absolute path.
 

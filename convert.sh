@@ -1,19 +1,25 @@
 ######## Converting LSST SVN repos to git, a helper script
+# We assume ~/lsst exists, is writable, and is on a local
+# filesystem (otherwise the conversion will be very slow)
+#
+# The temporary repositories are created in $TMP (defaults
+# to /tmp if $TMP not defined)
 
-export PERL5LIB="/raid14/home/mjuric/perl/lib64/perl5/site_perl/5.8.8/x86_64-linux-thread-multi"
+die() { echo "$@"; exit 1; }
+
 export SVN_REPOS=file://$HOME/lsst/repos
 export GIT_REPOS=$HOME/lsst/git
 export GIT_URL_ROOT="$GIT_REPOS"
-export GIT_URL_ROOT_EXT="git@svn.lsstcorp.org:"
-export GITOLITE_ADMIN="$HOME/projects/git-svn-migrate/gitolite-admin"
+export GIT_URL_ROOT_EXT="git@git.lsstcorp.org:"
 export IMPORT_REPOS_REGEX="^(DMS|Trac|GilTest|comparisons|contrib|eups|vendor)"
 
-# rsync our repositories. This can be skipped if running from NCSA,
-# but note that you'll have to point the SVN_REPOS URL above to the local SVN repo
+test -d $HOME/lsst || die "$HOME/lsst does not exist. Make it."
+mkdir -p $HOME/lsst/repos $GIT_REPOS || die "Could not create $HOME/lsst/repos or $GIT_REPOS"
+
+# rsync the SVN repositories (make them local)
 rsync -avz svn.lsstcorp.org:/lsst/repos $HOME/lsst || die "Failed rsyncing"
 
 # Get list of packages to be converted
-#
 (svn list -R $SVN_REPOS | grep -e 'trunk/$' | grep -v '/tags/' | sed 's/\/trunk\/$//' | grep -v '/trunk/' | grep -E "$IMPORT_REPOS_REGEX" > $GIT_REPOS/package-list.txt) || die "Failed getting the package list"
 # Flatten the hierarchy; convert '/' to '.'
 perl -e 'while($_=<>) { chomp; $d=$_; $d =~ tr/\//./; print "$d '"$SVN_REPOS"'/$_\n"; }' $GIT_REPOS/package-list.txt  > $GIT_REPOS/repos.txt || die "Failed flattening the hierarchy"
