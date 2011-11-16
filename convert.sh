@@ -1,4 +1,4 @@
-######## Converting LSST SVN repos to git, a helper script
+#### Converting LSST SVN repos to git, a helper script ##
 # We assume ~/lsst exists, is writable, and is on a local
 # filesystem (otherwise the conversion will be very slow)
 #
