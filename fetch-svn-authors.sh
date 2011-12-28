@@ -33,7 +33,7 @@ NAME
 \n\t\tSpecify the file containing the Subversion repository list.
 \n
 \n\t-a=<filename>, -a <filename>,
-\n\t--authors-file=[filename], --authors-file [filename]
+\n\t--authors-map=[filename], --authors-map [filename]
 \n\t\tSpecify the file containing the authors transformation data.
 \n
 \n\t-d=<folder>, -d <folder,
@@ -96,6 +96,8 @@ until [[ -z "$1" ]]; do
     url-file )     url_file=$value;;
     d )            destination=$value;;
     destination )  destination=$value;;
+    a )            authors_map=$value;;
+    authors-map )  authors_map=$value;;
 
     h )            echo $help | less >&2; exit;;
     help )         echo $help | less >&2; exit;;
@@ -142,9 +144,9 @@ done < $url_file
 # Process temp file one last time to show results.
 if [[ $destination == '' ]]; then
   # Display on standard output.
-  cat $tmp_file | sort -u;
+  cat $tmp_file | ./remap_authors.pl $authors_map | sort -u;
 else
   # Output to the specified destination file.
-  cat $tmp_file | sort -u > $destination;
+  cat $tmp_file | ./remap_authors.pl $authors_map | sort -u > $destination;
 fi
 unlink $tmp_file;
